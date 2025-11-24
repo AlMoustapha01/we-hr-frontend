@@ -1,3 +1,5 @@
+"use client";
+
 import {
   CalendarIcon,
   GroupIcon,
@@ -18,7 +20,7 @@ export const data: MenuGroup[] = [
       {
         icon: (active?: boolean) => <GridIcon active={active} />,
         label: "Dashboard",
-        url: "/",
+        url: "/dashboard",
       },
       {
         icon: (active?: boolean) => <PersonPlusIcon active={active} />,
