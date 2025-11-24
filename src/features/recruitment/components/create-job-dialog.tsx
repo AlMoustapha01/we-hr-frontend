@@ -1,161 +1,134 @@
 "use client";
 
 import { useState } from "react";
-import { JobPosting, JobType, ExperienceLevel } from "@/features/recruitment/types/recruitment";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+import {
+    Form,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormControl,
+    FormMessage,
+} from "@/components/ui/form";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
-    DialogFooter,
     DialogHeader,
+    DialogFooter,
     DialogTitle,
+    DialogDescription,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
     Select,
-    SelectContent,
-    SelectItem,
     SelectTrigger,
     SelectValue,
+    SelectContent,
+    SelectItem,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
+
 import {
     Popover,
-    PopoverContent,
     PopoverTrigger,
+    PopoverContent,
 } from "@/components/ui/popover";
-import { mockDepartments } from "@/data/departments";
-import { cn } from "@/lib/utils";
+
+import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Plus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
+import { useGetDepartments } from "@/features/department/api/get-departments";
+import { JobPosting } from "@/features/recruitment/types/recruitment";
+
+
+export const jobSchema = z.object({
+    title: z.string().min(1),
+    departmentId: z.string().min(1),
+    location: z.string().min(1),
+    type: z.enum(["full-time", "part-time", "contract", "internship"]),
+    experienceLevel: z.enum(["entry", "mid", "senior", "lead"]),
+    salaryMin: z.string().min(1),
+    salaryMax: z.string().min(1),
+    currency: z.string().min(1),
+    description: z.string().min(1),
+    closingDate: z.date(),
+    requirements: z.array(z.string().min(1)),
+    responsibilities: z.array(z.string().min(1)),
+    benefits: z.array(z.string().min(1)).optional(),
+});
+
+type JobFormValues = z.infer<typeof jobSchema>;
+
 interface CreateJobDialogProps {
     open: boolean;
-    onOpenChange: (open: boolean) => void;
+    onOpenChange: (o: boolean) => void;
     onCreateJob?: (job: Omit<JobPosting, "id" | "applicationsCount">) => void;
 }
 
-export function CreateJobDialog({
-    open,
-    onOpenChange,
-    onCreateJob,
-}: CreateJobDialogProps) {
-    const [title, setTitle] = useState("");
-    const [departmentId, setDepartmentId] = useState("");
-    const [location, setLocation] = useState("");
-    const [type, setType] = useState<JobType>("full-time");
-    const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("mid");
-    const [salaryMin, setSalaryMin] = useState("");
-    const [salaryMax, setSalaryMax] = useState("");
-    const [currency, setCurrency] = useState("USD");
-    const [description, setDescription] = useState("");
-    const [requirements, setRequirements] = useState<string[]>([""]);
-    const [responsibilities, setResponsibilities] = useState<string[]>([""]);
-    const [benefits, setBenefits] = useState<string[]>([""]);
-    const [closingDate, setClosingDate] = useState<Date | undefined>();
-    const [datePickerOpen, setDatePickerOpen] = useState(false);
+export function CreateJobDialog({ open, onOpenChange, onCreateJob }: CreateJobDialogProps) {
+    const { data } = useGetDepartments({ limit: 100 });
+    const departments = data?.pages.flatMap((p) => p.data) ?? [];
 
-    const handleAddItem = (
-        setter: React.Dispatch<React.SetStateAction<string[]>>,
-        items: string[]
-    ) => {
-        setter([...items, ""]);
-    };
+    const [calendarOpen, setCalendarOpen] = useState(false);
 
-    const handleRemoveItem = (
-        setter: React.Dispatch<React.SetStateAction<string[]>>,
-        items: string[],
-        index: number
-    ) => {
-        if (items.length > 1) {
-            setter(items.filter((_, i) => i !== index));
-        }
-    };
+    const form = useForm<JobFormValues>({
+        resolver: zodResolver(jobSchema),
+        defaultValues: {
+            title: "",
+            departmentId: "",
+            location: "",
+            type: "full-time",
+            experienceLevel: "mid",
+            salaryMin: "",
+            salaryMax: "",
+            currency: "USD",
+            description: "",
+            closingDate: undefined,
+            requirements: [""],
+            responsibilities: [""],
+            benefits: [""],
+        },
+    });
 
-    const handleUpdateItem = (
-        setter: React.Dispatch<React.SetStateAction<string[]>>,
-        items: string[],
-        index: number,
-        value: string
-    ) => {
-        const updated = [...items];
-        updated[index] = value;
-        setter(updated);
-    };
+    // Field Arrays
+    const requirements = useFieldArray({ name: "requirements" as never, control: form.control });
+    const responsibilities = useFieldArray({ name: "responsibilities" as never, control: form.control });
+    const benefits = useFieldArray({ name: "benefits" as never, control: form.control });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Validation
-        if (!title || !departmentId || !location || !salaryMin || !salaryMax || !description || !closingDate) {
-            toast.error("Please fill in all required fields");
-            return;
-        }
-
-        const department = mockDepartments.find((d) => d.id === departmentId);
+    const onSubmit = (values: JobFormValues) => {
+        const department = departments.find((d) => d.id === values.departmentId);
         if (!department) {
-            toast.error("Invalid department selected");
+            toast.error("Invalid department");
             return;
         }
 
-        // Filter out empty items
-        const filteredRequirements = requirements.filter((r) => r.trim() !== "");
-        const filteredResponsibilities = responsibilities.filter((r) => r.trim() !== "");
-        const filteredBenefits = benefits.filter((b) => b.trim() !== "");
-
-        if (filteredRequirements.length === 0 || filteredResponsibilities.length === 0) {
-            toast.error("Please add at least one requirement and responsibility");
-            return;
-        }
-
-        const newJob: Omit<JobPosting, "id" | "applicationsCount"> = {
-            title,
+        const job = {
+            ...values,
             department: department.name,
-            departmentId,
-            location,
-            type,
-            experienceLevel,
-            salary: {
-                min: parseInt(salaryMin),
-                max: parseInt(salaryMax),
-                currency,
-            },
-            description,
-            requirements: filteredRequirements,
-            responsibilities: filteredResponsibilities,
-            benefits: filteredBenefits,
             postedDate: format(new Date(), "yyyy-MM-dd"),
-            closingDate: format(closingDate, "yyyy-MM-dd"),
-            status: "open",
+            closingDate: format(values.closingDate, "yyyy-MM-dd"),
+            salary: {
+                min: parseInt(values.salaryMin),
+                max: parseInt(values.salaryMax),
+                currency: values.currency,
+            },
+            status: "open" as const,
+            benefits: values.benefits ?? [],
         };
 
-        if (onCreateJob) {
-            onCreateJob(newJob);
-        }
-
-        toast.success("Job posting created successfully!");
-        handleReset();
+        onCreateJob?.(job);
+        toast.success("Job created");
+        form.reset();
         onOpenChange(false);
-    };
-
-    const handleReset = () => {
-        setTitle("");
-        setDepartmentId("");
-        setLocation("");
-        setType("full-time");
-        setExperienceLevel("mid");
-        setSalaryMin("");
-        setSalaryMax("");
-        setCurrency("USD");
-        setDescription("");
-        setRequirements([""]);
-        setResponsibilities([""]);
-        setBenefits([""]);
-        setClosingDate(undefined);
     };
 
     return (
@@ -164,64 +137,84 @@ export function CreateJobDialog({
                 <DialogHeader>
                     <DialogTitle>Post New Job</DialogTitle>
                     <DialogDescription>
-                        Create a new job posting to attract qualified candidates
+                        Create a job posting to attract qualified candidates.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="space-y-6 py-4">
-                        {/* Basic Information */}
-                        <div className="space-y-4">
-                            <h3 className="font-semibold text-sm">Basic Information</h3>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
 
-                            <div className="grid gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="title">Job Title *</Label>
-                                    <Input
-                                        id="title"
-                                        placeholder="e.g., Senior Full Stack Developer"
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        required
-                                    />
-                                </div>
+                        {/* Job Title */}
+                        <FormField
+                            control={form.control}
+                            name="title"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Job Title *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Senior Developer" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="department">Department *</Label>
-                                        <Select value={departmentId} onValueChange={setDepartmentId}>
-                                            <SelectTrigger id="department">
-                                                <SelectValue placeholder="Select department" />
-                                            </SelectTrigger>
+                        {/* Department + Location */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="departmentId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Department *</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select department" />
+                                                </SelectTrigger>
+                                            </FormControl>
                                             <SelectContent>
-                                                {mockDepartments.map((dept) => (
+                                                {departments.map((dept) => (
                                                     <SelectItem key={dept.id} value={dept.id}>
                                                         {dept.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                    </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="location">Location *</Label>
-                                        <Input
-                                            id="location"
-                                            placeholder="e.g., San Francisco, CA (Hybrid)"
-                                            value={location}
-                                            onChange={(e) => setLocation(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
+                            <FormField
+                                control={form.control}
+                                name="location"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Location *</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Abidjan, CI" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="type">Job Type</Label>
-                                        <Select value={type} onValueChange={(v) => setType(v as JobType)}>
-                                            <SelectTrigger id="type">
-                                                <SelectValue />
-                                            </SelectTrigger>
+                        {/* Type + Level */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="type"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Job Type</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                            </FormControl>
                                             <SelectContent>
                                                 <SelectItem value="full-time">Full-time</SelectItem>
                                                 <SelectItem value="part-time">Part-time</SelectItem>
@@ -229,260 +222,246 @@ export function CreateJobDialog({
                                                 <SelectItem value="internship">Internship</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                    </div>
+                                    </FormItem>
+                                )}
+                            />
 
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="level">Experience Level</Label>
-                                        <Select
-                                            value={experienceLevel}
-                                            onValueChange={(v) => setExperienceLevel(v as ExperienceLevel)}
-                                        >
-                                            <SelectTrigger id="level">
-                                                <SelectValue />
-                                            </SelectTrigger>
+                            <FormField
+                                control={form.control}
+                                name="experienceLevel"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Experience Level</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                            </FormControl>
                                             <SelectContent>
-                                                <SelectItem value="entry">Entry Level</SelectItem>
-                                                <SelectItem value="mid">Mid Level</SelectItem>
-                                                <SelectItem value="senior">Senior Level</SelectItem>
-                                                <SelectItem value="lead">Lead/Principal</SelectItem>
+                                                <SelectItem value="entry">Entry</SelectItem>
+                                                <SelectItem value="mid">Mid</SelectItem>
+                                                <SelectItem value="senior">Senior</SelectItem>
+                                                <SelectItem value="lead">Lead</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                    </div>
-                                </div>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="closingDate">Application Deadline *</Label>
-                                    <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                        {/* Closing Date */}
+                        <FormField
+                            control={form.control}
+                            name="closingDate"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Application Deadline *</FormLabel>
+                                    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className={cn(
-                                                    "justify-start text-left font-normal",
-                                                    !closingDate && "text-muted-foreground"
-                                                )}
-                                            >
-                                                <CalendarIcon className="mr-2 size-4" />
-                                                {closingDate ? format(closingDate, "PPP") : <span>Pick a date</span>}
-                                            </Button>
+                                            <FormControl>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className={cn(
+                                                        "w-full justify-start text-left",
+                                                        !field.value && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    <CalendarIcon className="mr-2 size-4" />
+                                                    {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                                </Button>
+                                            </FormControl>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
+
+                                        <PopoverContent align="start" className="p-0">
                                             <Calendar
                                                 mode="single"
-                                                selected={closingDate}
-                                                onSelect={(date) => {
-                                                    setClosingDate(date);
-                                                    setDatePickerOpen(false);
+                                                selected={field.value}
+                                                onSelect={(v) => {
+                                                    field.onChange(v);
+                                                    setCalendarOpen(false);
                                                 }}
-                                                disabled={(date) => date < new Date()}
-                                                initialFocus
+                                                disabled={(d) => d < new Date()}
                                             />
                                         </PopoverContent>
                                     </Popover>
-                                </div>
-                            </div>
-                        </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                        {/* Compensation */}
-                        <div className="space-y-4">
-                            <h3 className="font-semibold text-sm">Compensation</h3>
-
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="salaryMin">Min Salary *</Label>
-                                    <Input
-                                        id="salaryMin"
-                                        type="number"
-                                        placeholder="60000"
-                                        value={salaryMin}
-                                        onChange={(e) => setSalaryMin(e.target.value)}
-                                        required
+                        {/* Salary */}
+                        <div className="grid grid-cols-3 gap-4">
+                            {["salaryMin", "salaryMax", "currency"].map((fieldName, index) =>
+                                fieldName !== "currency" ? (
+                                    <FormField
+                                        key={fieldName}
+                                        control={form.control}
+                                        name={fieldName as "salaryMin" | "salaryMax"}
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>{index === 0 ? "Min Salary *" : "Max Salary *"}</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="salaryMax">Max Salary *</Label>
-                                    <Input
-                                        id="salaryMax"
-                                        type="number"
-                                        placeholder="80000"
-                                        value={salaryMax}
-                                        onChange={(e) => setSalaryMax(e.target.value)}
-                                        required
+                                ) : (
+                                    <FormField
+                                        key="currency"
+                                        control={form.control}
+                                        name="currency"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Currency</FormLabel>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="USD">USD</SelectItem>
+                                                        <SelectItem value="EUR">EUR</SelectItem>
+                                                        <SelectItem value="GBP">GBP</SelectItem>
+                                                        <SelectItem value="CAD">CAD</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="currency">Currency</Label>
-                                    <Select value={currency} onValueChange={setCurrency}>
-                                        <SelectTrigger id="currency">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="USD">USD</SelectItem>
-                                            <SelectItem value="EUR">EUR</SelectItem>
-                                            <SelectItem value="GBP">GBP</SelectItem>
-                                            <SelectItem value="CAD">CAD</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
+                                )
+                            )}
                         </div>
 
                         {/* Description */}
-                        <div className="space-y-4">
-                            <h3 className="font-semibold text-sm">Job Description</h3>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="description">Description *</Label>
-                                <Textarea
-                                    id="description"
-                                    placeholder="Provide a detailed description of the role..."
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows={4}
-                                    required
-                                />
-                            </div>
-                        </div>
+                        <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Description *</FormLabel>
+                                    <FormControl>
+                                        <Textarea rows={4} {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
                         {/* Requirements */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-sm">Requirements *</h3>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleAddItem(setRequirements, requirements)}
-                                >
-                                    <Plus className="size-4 mr-1" />
-                                    Add
-                                </Button>
-                            </div>
-
-                            <div className="space-y-2">
-                                {requirements.map((req, index) => (
-                                    <div key={index} className="flex gap-2">
-                                        <Input
-                                            placeholder={`Requirement ${index + 1}`}
-                                            value={req}
-                                            onChange={(e) =>
-                                                handleUpdateItem(setRequirements, requirements, index, e.target.value)
-                                            }
-                                        />
-                                        {requirements.length > 1 && (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleRemoveItem(setRequirements, requirements, index)}
-                                            >
-                                                <X className="size-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <FieldArrayBlock
+                            title="Requirements *"
+                            fieldArray={requirements}
+                            placeholder="Requirement"
+                            control={form.control}
+                            name="requirements"
+                        />
 
                         {/* Responsibilities */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-sm">Responsibilities *</h3>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleAddItem(setResponsibilities, responsibilities)}
-                                >
-                                    <Plus className="size-4 mr-1" />
-                                    Add
-                                </Button>
-                            </div>
-
-                            <div className="space-y-2">
-                                {responsibilities.map((resp, index) => (
-                                    <div key={index} className="flex gap-2">
-                                        <Input
-                                            placeholder={`Responsibility ${index + 1}`}
-                                            value={resp}
-                                            onChange={(e) =>
-                                                handleUpdateItem(setResponsibilities, responsibilities, index, e.target.value)
-                                            }
-                                        />
-                                        {responsibilities.length > 1 && (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() =>
-                                                    handleRemoveItem(setResponsibilities, responsibilities, index)
-                                                }
-                                            >
-                                                <X className="size-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <FieldArrayBlock
+                            title="Responsibilities *"
+                            fieldArray={responsibilities}
+                            placeholder="Responsibility"
+                            control={form.control}
+                            name="responsibilities"
+                        />
 
                         {/* Benefits */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-sm">Benefits (Optional)</h3>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleAddItem(setBenefits, benefits)}
-                                >
-                                    <Plus className="size-4 mr-1" />
-                                    Add
-                                </Button>
-                            </div>
+                        <FieldArrayBlock
+                            title="Benefits (Optional)"
+                            fieldArray={benefits}
+                            placeholder="Benefit"
+                            control={form.control}
+                            name="benefits"
+                        />
 
-                            <div className="space-y-2">
-                                {benefits.map((benefit, index) => (
-                                    <div key={index} className="flex gap-2">
-                                        <Input
-                                            placeholder={`Benefit ${index + 1}`}
-                                            value={benefit}
-                                            onChange={(e) =>
-                                                handleUpdateItem(setBenefits, benefits, index, e.target.value)
-                                            }
-                                        />
-                                        {benefits.length > 1 && (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleRemoveItem(setBenefits, benefits, index)}
-                                            >
-                                                <X className="size-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    form.reset();
+                                    onOpenChange(false);
+                                }}
+                            >
+                                Cancel
+                            </Button>
 
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                                handleReset();
-                                onOpenChange(false);
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit">Post Job</Button>
-                    </DialogFooter>
-                </form>
+                            <Button type="submit">
+                                Post Job
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/* Small helper component for repeated arrays */
+interface FieldArrayBlockProps {
+    title: string;
+    fieldArray: {
+        fields: Array<Record<"id", string>>;
+        append: (value: string) => void;
+        remove: (index: number) => void;
+    };
+    placeholder: string;
+    control: ReturnType<typeof useForm<JobFormValues>>["control"];
+    name: "requirements" | "responsibilities" | "benefits";
+}
+
+function FieldArrayBlock({ title, fieldArray, placeholder, control, name }: FieldArrayBlockProps) {
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-sm">{title}</h3>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => fieldArray.append("")}
+                >
+                    <Plus className="size-4 mr-1" /> Add
+                </Button>
+            </div>
+
+            <div className="space-y-2">
+                {fieldArray.fields.map((field, index) => (
+                    <FormField
+                        key={field.id}
+                        control={control}
+                        name={`${name}.${index}` as `${typeof name}.${number}`}
+                        render={({ field: formField }) => (
+                            <FormItem>
+                                <div className="flex gap-2">
+                                    <FormControl>
+                                        <Input
+                                            placeholder={`${placeholder} ${index + 1}`}
+                                            {...formField}
+                                        />
+                                    </FormControl>
+                                    {fieldArray.fields.length > 1 && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            type="button"
+                                            onClick={() => fieldArray.remove(index)}
+                                        >
+                                            <X className="size-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                ))}
+            </div>
+        </div>
     );
 }
