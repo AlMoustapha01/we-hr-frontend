@@ -8,21 +8,18 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Users, MoreVertical, Edit, Trash2, UserCircle, ExternalLink } from "lucide-react";
-import { useGetDepartmentEmployees } from "@/features/employee";
-import { useGetDepartment } from "../api/get-department";
+import { Users, MoreVertical, Edit, Trash2, UserCircle } from "lucide-react";
+import { useGetDepartmentEmployees, useGetEmployee } from "@/features/employee";
 import { useRouter } from "next/navigation";
 
 interface DepartmentCardProps {
     department: Department;
-    onEdit?: (department: Department) => void;
     onDelete?: (department: Department) => void;
     className?: string;
 }
 
 export function DepartmentCard({
     department,
-    onEdit,
     onDelete,
     className,
 }: DepartmentCardProps) {
@@ -33,7 +30,7 @@ export function DepartmentCard({
     const employeeCount = employees?.length || 0;
 
     // Fetch manager details if managerId exists
-    const { data: manager } = useGetDepartment(department.managerId || "", !!department.managerId);
+    const { data: manager } = useGetEmployee(department.managerId || "", !!department.managerId);
 
     return (
         <div
@@ -58,10 +55,6 @@ export function DepartmentCard({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => router.push(`/department/${department.id}`)}>
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEdit?.(department)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                         </DropdownMenuItem>
@@ -96,11 +89,7 @@ export function DepartmentCard({
                 </div>
             </div>
 
-            {/* Department Info */}
-            <div className="mt-4 text-xs text-gray-500">
-                <p>Created: {new Date(department.createdAt).toLocaleDateString()}</p>
-                <p>Updated: {new Date(department.updatedAt).toLocaleDateString()}</p>
-            </div>
+
         </div>
     );
 }

@@ -68,9 +68,9 @@ const positions = Object.values(EmployeePosition);
 
 const updateEmployeeSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Invalid email address"),
+    email: z.email("Invalid email address"),
     phone: z.string().min(10, "Phone number must be at least 10 characters"),
-    position: z.enum(EmployeePosition),
+    position: z.enum(positions),
     role: z.string().min(2, "Role must be at least 2 characters"),
     joinDate: z.date(),
     salary: z.number().min(0, "Salary must be a positive number"),
@@ -87,29 +87,23 @@ export default function EmployeeDetailPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [departmentOpen, setDepartmentOpen] = useState(false);
 
-    // Fetch employee details
     const { data: employee, isLoading: isEmployeeLoading } = useGetEmployee(employeeId);
 
-    // Fetch departments for dropdown
     const { data: departmentsData, isLoading: isLoadingDepartments } = useGetDepartments({
         limit: 100,
     });
 
     const departments = departmentsData?.pages.flatMap((page) => page.data) || [];
 
-    // Fetch current department details
     const { data: currentDepartment } = useGetDepartment(
         employee?.departmentId || "",
         !!employee?.departmentId
     );
 
-    // Update employee mutation
     const updateEmployee = useUpdateEmployee();
 
-    // Delete employee mutation
     const deleteEmployee = useDeleteEmployee();
 
-    // Form for updating employee
     const form = useForm<UpdateEmployeeFormValues>({
         resolver: zodResolver(updateEmployeeSchema),
         values: employee ? {
@@ -123,7 +117,6 @@ export default function EmployeeDetailPage() {
             departmentId: employee.departmentId,
         } : undefined,
     });
-
 
     const handleUpdateEmployee = (values: UpdateEmployeeFormValues) => {
         updateEmployee.mutate(
@@ -312,74 +305,75 @@ export default function EmployeeDetailPage() {
                                 </Field>
                             </div>
 
-                            {/* Department */}
-                            <Field data-invalid={!!form.formState.errors.departmentId} className="flex flex-col">
-                                <FieldLabel htmlFor="departmentId">Department</FieldLabel>
-                                <Controller
-                                    name="departmentId"
-                                    control={form.control}
-                                    render={({ field }) => (
-                                        <Popover open={departmentOpen} onOpenChange={setDepartmentOpen}>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    role="combobox"
-                                                    aria-expanded={departmentOpen}
-                                                    className="w-full justify-between"
-                                                    disabled={isLoadingDepartments}
-                                                >
-                                                    {field.value
-                                                        ? departments.find((dept) => dept.id === field.value)?.name
-                                                        : "Select department..."}
-                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-full p-0">
-                                                <Command>
-                                                    <CommandInput placeholder="Search departments..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>
-                                                            {isLoadingDepartments
-                                                                ? "Loading departments..."
-                                                                : "No departments found."}
-                                                        </CommandEmpty>
-                                                        <CommandGroup>
-                                                            {departments.map((department) => (
-                                                                <CommandItem
-                                                                    key={department.id}
-                                                                    value={department.name}
-                                                                    onSelect={() => {
-                                                                        field.onChange(
-                                                                            department.id === field.value
-                                                                                ? ""
-                                                                                : department.id
-                                                                        );
-                                                                        setDepartmentOpen(false);
-                                                                    }}
-                                                                >
-                                                                    <Check
-                                                                        className={cn(
-                                                                            "mr-2 h-4 w-4",
-                                                                            field.value === department.id
-                                                                                ? "opacity-100"
-                                                                                : "opacity-0"
-                                                                        )}
-                                                                    />
-                                                                    {department.name}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-                                    )}
-                                />
-                                <FieldError errors={[form.formState.errors.departmentId]} />
-                            </Field>
+
 
                             {/* Position and Status */}
                             <div className="grid grid-cols-2 gap-4">
+                                {/* Department */}
+                                <Field data-invalid={!!form.formState.errors.departmentId} className="flex flex-col">
+                                    <FieldLabel htmlFor="departmentId">Department</FieldLabel>
+                                    <Controller
+                                        name="departmentId"
+                                        control={form.control}
+                                        render={({ field }) => (
+                                            <Popover open={departmentOpen} onOpenChange={setDepartmentOpen}>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        role="combobox"
+                                                        aria-expanded={departmentOpen}
+                                                        className="w-full justify-between"
+                                                        disabled={isLoadingDepartments}
+                                                    >
+                                                        {field.value
+                                                            ? departments.find((dept) => dept.id === field.value)?.name
+                                                            : "Select department..."}
+                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-full p-0">
+                                                    <Command>
+                                                        <CommandInput placeholder="Search departments..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>
+                                                                {isLoadingDepartments
+                                                                    ? "Loading departments..."
+                                                                    : "No departments found."}
+                                                            </CommandEmpty>
+                                                            <CommandGroup>
+                                                                {departments.map((department) => (
+                                                                    <CommandItem
+                                                                        key={department.id}
+                                                                        value={department.name}
+                                                                        onSelect={() => {
+                                                                            field.onChange(
+                                                                                department.id === field.value
+                                                                                    ? ""
+                                                                                    : department.id
+                                                                            );
+                                                                            setDepartmentOpen(false);
+                                                                        }}
+                                                                    >
+                                                                        <Check
+                                                                            className={cn(
+                                                                                "mr-2 h-4 w-4",
+                                                                                field.value === department.id
+                                                                                    ? "opacity-100"
+                                                                                    : "opacity-0"
+                                                                            )}
+                                                                        />
+                                                                        {department.name}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
+                                        )}
+                                    />
+                                    <FieldError errors={[form.formState.errors.departmentId]} />
+                                </Field>
                                 <Field data-invalid={!!form.formState.errors.position}>
                                     <FieldLabel htmlFor="position">Position</FieldLabel>
                                     <Controller

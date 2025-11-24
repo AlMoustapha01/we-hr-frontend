@@ -23,29 +23,19 @@ export default function DepartmentPage() {
     // Delete department mutation
     const deleteDepartment = useDeleteDepartment();
 
-    // Flatten all pages into a single array
     const departments = useMemo(() => {
         return departmentsData?.pages.flatMap((page) => page.data) || [];
     }, [departmentsData]);
 
-    // Calculate statistics
     const totalDepartments = departments.length;
 
-    // Note: We'll need to fetch employee counts per department for accurate stats
-    // For now, showing department count only
     const totalEmployees = 0; // TODO: Calculate from department employees
     const totalOpenPositions = 0; // TODO: Calculate from department data
     const avgEmployeesPerDept = totalDepartments > 0 ? Math.round(totalEmployees / totalDepartments) : 0;
 
-    // Filter departments based on search
     const filteredDepartments = departments.filter((dept) =>
         dept.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-
-    const handleEditDepartment = (department: Department) => {
-        toast.info(`Edit functionality for ${department.name} - Coming soon!`);
-    };
 
     const handleDeleteDepartment = (department: Department) => {
         setDepartmentToDelete(department);
@@ -86,7 +76,6 @@ export default function DepartmentPage() {
                 <AddDepartmentDialog />
             </div>
 
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard variant="primary">
                     <div className="flex items-center justify-between">
@@ -129,7 +118,6 @@ export default function DepartmentPage() {
                 </StatCard>
             </div>
 
-            {/* Search Bar */}
             <div className="flex items-center gap-4">
                 <Input
                     placeholder="Search departments by name, description, or manager..."
@@ -144,7 +132,6 @@ export default function DepartmentPage() {
                 )}
             </div>
 
-            {/* Departments Grid */}
             <div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">All Departments</h2>
                 {isLoading ? (
@@ -171,7 +158,6 @@ export default function DepartmentPage() {
                                 <DepartmentCard
                                     key={department.id}
                                     department={department}
-                                    onEdit={handleEditDepartment}
                                     onDelete={handleDeleteDepartment}
                                 />
                             ))}
@@ -198,7 +184,6 @@ export default function DepartmentPage() {
                 )}
             </div>
 
-            {/* Confirm Delete Dialog */}
             <ConfirmDialog
                 open={deleteDialogOpen}
                 onOpenChange={setDeleteDialogOpen}
